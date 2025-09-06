@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Image, Modal, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Modal, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Order, OrderItem, updateOrder } from '../../utils/orderStorage';
 
 interface Product {
   id: number;
@@ -10,26 +11,32 @@ interface Product {
   brandId: number;
 }
 
-interface SelectedItem {
-  productId: number;
-  productName: string;
-  brandName: string;
-  unit: 'Pc' | 'Outer' | 'Case';
-  quantity: number;
-}
-
-export default function NewOrderScreen() {
+export default function EditOrderScreen() {
   const router = useRouter();
-  const { retailerName, retailerPhone } = useLocalSearchParams<{ 
-    retailerName: string;
-    retailerPhone: string;
+  const { orderData } = useLocalSearchParams<{ 
+    orderData: string;
   }>();
   
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState<any>(null);
-  const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [order, setOrder] = useState<Order | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Mock products for all brands (3 products per brand)
+  // Parse order data from params
+  React.useEffect(() => {
+    if (orderData) {
+      try {
+        const parsedOrder = JSON.parse(orderData);
+        setOrder(parsedOrder);
+        setOrderItems(parsedOrder.items || []);
+      } catch (error) {
+        console.error('Error parsing order data:', error);
+      }
+    }
+  }, [orderData]);
+
+  // Mock products for all brands (same as new-order.tsx)
   const products: Product[] = [
     // MARICO
     { id: 1, name: 'Parachute Coconut Oil', brandId: 1 },
@@ -288,7 +295,7 @@ export default function NewOrderScreen() {
   };
 
   const handleAddToOrder = (product: Product, unit: 'Pc' | 'Outer' | 'Case', quantity: number) => {
-    setSelectedItems(prevItems => {
+    setOrderItems(prevItems => {
       const existingItemIndex = prevItems.findIndex(
         item => item.productId === product.id && item.unit === unit
       );
@@ -300,7 +307,7 @@ export default function NewOrderScreen() {
         return updatedItems;
       } else {
         // Add new item
-        const newItem: SelectedItem = {
+        const newItem: OrderItem = {
           productId: product.id,
           productName: product.name,
           brandName: selectedBrand.name,
@@ -312,19 +319,119 @@ export default function NewOrderScreen() {
     });
   };
 
-  const getTotalItems = () => {
-    return selectedItems.reduce((total, item) => total + item.quantity, 0);
+  const handleUpdateQuantity = (productId: number, unit: 'Pc' | 'Outer' | 'Case', newQuantity: number) => {
+    setOrderItems(prevItems => {
+      const updatedItems = prevItems.map(item => {
+        if (item.productId === productId && item.unit === unit) {
+          return { ...item, quantity: Math.max(0, newQuantity) };
+        }
+        return item;
+      });
+      
+      // Remove items with quantity 0
+      return updatedItems.filter(item => item.quantity > 0);
+    });
   };
 
-  const handleNavigateToSummary = () => {
-    router.push({
-      pathname: '/order-summary',
-      params: {
-        retailerName: retailerName || 'N/A',
-        retailerPhone: retailerPhone || 'N/A',
-        orderItems: JSON.stringify(selectedItems)
-      }
-    });
+  const handleRemoveItem = (productId: number, unit: 'Pc' | 'Outer' | 'Case') => {
+    setOrderItems(prevItems => 
+      prevItems.filter(item => !(item.productId === productId && item.unit === unit))
+    );
+  };
+
+  const getTotalItems = () => {
+    return orderItems.reduce((total, item) => total + item.quantity, 0);
+  };
+
+  const handleSaveOrder = async () => {
+    if (!order) return;
+    
+    if (orderItems.length === 0) {
+      Alert.alert('Error', 'Please add items to your order before saving.');
+      return;
+    }
+
+    setIsSaving(true);
+    
+    try {
+      const totalItems = orderItems.reduce((total, item) => total + item.quantity, 0);
+      
+      await updateOrder(order.id, {
+        items: orderItems,
+        totalItems: totalItems,
+        // Update the order with current items
+      });
+
+      Alert.alert(
+        'Order Updated!', 
+        `Order ${order.orderNumber} has been updated successfully.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Navigate back to orders screen
+              router.push('/(tabs)/orders');
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error updating order:', error);
+      Alert.alert('Error', 'Failed to update order. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleMarkAsCompleted = async () => {
+    if (!order) return;
+
+    Alert.alert(
+      'Mark Order as Completed',
+      `Are you sure you want to mark order ${order.orderNumber} as completed?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Complete',
+          style: 'default',
+          onPress: async () => {
+            setIsSaving(true);
+            
+            try {
+              const totalItems = orderItems.reduce((total, item) => total + item.quantity, 0);
+              
+              await updateOrder(order.id, {
+                items: orderItems,
+                totalItems: totalItems,
+                status: 'Completed',
+              });
+
+              Alert.alert(
+                'Order Completed!', 
+                `Order ${order.orderNumber} has been marked as completed successfully.`,
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      // Navigate back to orders screen
+                      router.push('/(tabs)/orders');
+                    }
+                  }
+                ]
+              );
+            } catch (error) {
+              console.error('Error completing order:', error);
+              Alert.alert('Error', 'Failed to complete order. Please try again.');
+            } finally {
+              setIsSaving(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const ProductModal = () => {
@@ -383,7 +490,6 @@ export default function NewOrderScreen() {
               <Text style={styles.addButton}>Add</Text>
             </TouchableOpacity>
           </View>
-
 
           {/* Category Header */}
           <View style={styles.categoryHeader}>
@@ -454,7 +560,7 @@ export default function NewOrderScreen() {
                         <Ionicons 
                           name="add" 
                           size={16} 
-                          color={(productSelections[product.id]?.quantity || 0) > 0 ? "#ffffff" : "#8B5CF6"} 
+                          color={(productSelections[product.id]?.quantity || 0) ? "#ffffff" : "#8B5CF6"} 
                         />
                       </TouchableOpacity>
                     </TouchableOpacity>
@@ -467,6 +573,40 @@ export default function NewOrderScreen() {
       </Modal>
     );
   };
+
+  const OrderItemCard = ({ item }: { item: OrderItem }) => (
+    <View style={styles.orderItemCard}>
+      <View style={styles.orderItemInfo}>
+        <Text style={styles.orderItemName}>{item.productName}</Text>
+        <Text style={styles.orderItemBrand}>{item.brandName} • {item.unit}</Text>
+      </View>
+      
+      <View style={styles.orderItemControls}>
+        <View style={styles.quantityControls}>
+          <TouchableOpacity
+            style={styles.quantityButton}
+            onPress={() => handleUpdateQuantity(item.productId, item.unit, item.quantity - 1)}
+          >
+            <Ionicons name="remove" size={16} color="#8B5CF6" />
+          </TouchableOpacity>
+          <Text style={styles.quantityText}>{item.quantity}</Text>
+          <TouchableOpacity
+            style={styles.quantityButton}
+            onPress={() => handleUpdateQuantity(item.productId, item.unit, item.quantity + 1)}
+          >
+            <Ionicons name="add" size={16} color="#8B5CF6" />
+          </TouchableOpacity>
+        </View>
+        
+        <TouchableOpacity 
+          style={styles.removeButton}
+          onPress={() => handleRemoveItem(item.productId, item.unit)}
+        >
+          <Ionicons name="trash-outline" size={16} color="#FF3B30" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   const BrandCard = ({ brand }: { brand: any }) => (
     <TouchableOpacity 
@@ -482,6 +622,16 @@ export default function NewOrderScreen() {
     </TouchableOpacity>
   );
 
+  if (!order) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading order...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
@@ -494,54 +644,87 @@ export default function NewOrderScreen() {
         >
           <Ionicons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>New Order</Text>
-        <View style={styles.placeholder} />
-      </View>
-
-      {/* Welcome Section */}
-      <View style={styles.welcomeSection}>
-        <View style={styles.welcomeContent}>
-          <View style={styles.welcomeIconContainer}>
-            <Ionicons name="storefront" size={32} color="#007AFF" />
-          </View>
-          <View style={styles.welcomeTextContainer}>
-            <Text style={styles.welcomeGreeting}>Welcome back!</Text>
-            <Text style={styles.welcomeText}>
-              {retailerName || 'Retailer'}
+        <Text style={styles.headerTitle}>Edit Order</Text>
+        <View style={styles.headerActions}>
+          {order?.status === 'Pending' && (
+            <TouchableOpacity 
+              style={styles.completeButton}
+              onPress={handleMarkAsCompleted}
+              disabled={isSaving}
+            >
+              <Text style={styles.completeButtonText}>Complete</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={handleSaveOrder} disabled={isSaving}>
+            <Text style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}>
+              {isSaving ? 'Saving...' : 'Save'}
             </Text>
-            <Text style={styles.subtitleText}>
-              Select a brand to start creating your order
-            </Text>
-          </View>
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* Brands Section */}
-      <ScrollView style={styles.brandsContainer} showsVerticalScrollIndicator={false}>
-        <View style={styles.brandsHeader}>
-          <Text style={styles.brandsTitle}>
-            Available Brands ({brands.length})
-          </Text>
+      {/* Order Info Section */}
+      <View style={styles.orderInfoSection}>
+        <View style={styles.orderInfoHeader}>
+          <Text style={styles.orderInfoTitle}>Order Details</Text>
+          <Text style={styles.orderNumber}>{order.orderNumber}</Text>
         </View>
         
-        <View style={styles.brandsList}>
-          {brands.map((brand) => (
-            <BrandCard key={brand.id} brand={brand} />
+        <View style={styles.retailerInfo}>
+          <View style={styles.infoRow}>
+            <Ionicons name="storefront-outline" size={20} color="#007AFF" />
+            <Text style={styles.infoLabel}>Retailer Name:</Text>
+            <Text style={styles.infoValue}>{order.counterName}</Text>
+          </View>
+          
+          <View style={styles.infoRow}>
+            <Ionicons name="call-outline" size={20} color="#007AFF" />
+            <Text style={styles.infoLabel}>Phone No:</Text>
+            <Text style={styles.infoValue}>+91 9876543210</Text>
+          </View>
+          
+          <View style={styles.infoRow}>
+            <Ionicons name="location-outline" size={20} color="#007AFF" />
+            <Text style={styles.infoLabel}>Bit:</Text>
+            <Text style={styles.infoValue}>{order.bit}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Order Items Section */}
+      <ScrollView style={styles.contentContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Order Items ({orderItems.length})</Text>
+        </View>
+        
+        <View style={styles.orderItemsList}>
+          {orderItems.map((item, index) => (
+            <OrderItemCard key={`${item.productId}-${item.unit}-${index}`} item={item} />
           ))}
+        </View>
+
+
+        {/* Brands List */}
+        <View style={styles.brandsSection}>
+          <Text style={styles.brandsTitle}>Available Brands</Text>
+          <View style={styles.brandsList}>
+            {brands.map((brand) => (
+              <BrandCard key={brand.id} brand={brand} />
+            ))}
+          </View>
         </View>
       </ScrollView>
 
       {/* Bottom Summary */}
-      {selectedItems.length > 0 && (
-        <TouchableOpacity style={styles.bottomSummary} onPress={handleNavigateToSummary}>
+      {orderItems.length > 0 && (
+        <View style={styles.bottomSummary}>
           <View style={styles.summaryContent}>
             <Ionicons name="cube-outline" size={20} color="#007AFF" />
             <Text style={styles.summaryText}>
-              Total Items: {getTotalItems()} Added
+              Total Items: {getTotalItems()} Updated
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="#007AFF" />
-        </TouchableOpacity>
+        </View>
       )}
 
       <ProductModal />
@@ -554,6 +737,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -564,6 +756,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e5e5ea',
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  completeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#4CAF50',
+  },
+  completeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
   backButton: {
     padding: 5,
   },
@@ -572,75 +780,153 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1a1a1a',
   },
-  placeholder: {
-    width: 34,
+  saveButton: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
   },
-  welcomeSection: {
+  saveButtonDisabled: {
+    color: '#cccccc',
+  },
+  orderInfoSection: {
     backgroundColor: '#ffffff',
     marginHorizontal: 20,
     marginTop: 20,
-    marginBottom: 10,
     borderRadius: 16,
-    padding: 24,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 2,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
-  welcomeContent: {
+  orderInfoHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 16,
   },
-  welcomeIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#f0f8ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
+  orderInfoTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
   },
-  welcomeTextContainer: {
-    flex: 1,
-  },
-  welcomeGreeting: {
+  orderNumber: {
     fontSize: 14,
     fontWeight: '600',
     color: '#007AFF',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
-  welcomeText: {
-    fontSize: 24,
-    fontWeight: 'bold',
+  retailerInfo: {
+    gap: 12,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  infoLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    minWidth: 100,
+  },
+  infoValue: {
+    fontSize: 14,
     color: '#1a1a1a',
-    marginBottom: 6,
+    flex: 1,
   },
-  subtitleText: {
-    fontSize: 15,
-    color: '#666666',
-    lineHeight: 20,
-  },
-  brandsContainer: {
+  contentContainer: {
     flex: 1,
     paddingHorizontal: 20,
   },
-  brandsHeader: {
+  sectionHeader: {
     paddingVertical: 15,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+  },
+  orderItemsList: {
+    gap: 12,
+    marginBottom: 20,
+  },
+  orderItemCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  orderItemInfo: {
+    flex: 1,
+  },
+  orderItemName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    marginBottom: 4,
+  },
+  orderItemBrand: {
+    fontSize: 14,
+    color: '#666666',
+  },
+  orderItemControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  quantityControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#8B5CF6',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  quantityButton: {
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quantityText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#8B5CF6',
+    paddingHorizontal: 12,
+    minWidth: 30,
+    textAlign: 'center',
+  },
+  removeButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#FFF5F5',
+  },
+  brandsSection: {
+    marginBottom: 20,
   },
   brandsTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#1a1a1a',
+    marginBottom: 15,
   },
   brandsList: {
     gap: 12,
-    paddingBottom: 20,
   },
   brandCard: {
     backgroundColor: '#ffffff',
@@ -682,13 +968,11 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderTopWidth: 1,
     borderTopColor: '#e5e5ea',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   summaryContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   summaryText: {
     fontSize: 16,
@@ -696,7 +980,7 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     marginLeft: 8,
   },
-  // Modal Styles
+  // Modal Styles (same as new-order.tsx)
   modalContainer: {
     flex: 1,
     backgroundColor: '#ffffff',
@@ -707,7 +991,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: '#8B5CF6', // Purple header like in image
+    backgroundColor: '#8B5CF6',
   },
   modalTitle: {
     fontSize: 18,
@@ -730,7 +1014,7 @@ const styles = StyleSheet.create({
   categoryTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#8B5CF6', // Purple brand name
+    color: '#8B5CF6',
   },
   modalContent: {
     flex: 1,
@@ -781,33 +1065,11 @@ const styles = StyleSheet.create({
   quantitySection: {
     alignItems: 'center',
   },
-  quantityControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#8B5CF6',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-  },
   quantityControlsSelected: {
     backgroundColor: '#8B5CF6',
   },
-  quantityButton: {
-    padding: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  quantityText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#8B5CF6',
-    paddingHorizontal: 12,
-    minWidth: 30,
-    textAlign: 'center',
-  },
   quantityTextSelected: {
     color: '#ffffff',
+    fontWeight: '600',
   },
 });

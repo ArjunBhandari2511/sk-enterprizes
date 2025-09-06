@@ -1,13 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
-import { Dimensions, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, Dimensions, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import Modal from 'react-native-modal';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { deleteOrder, getOrders, Order } from '../../utils/orderStorage';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('screen');
 
 export default function OrdersScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -19,110 +23,85 @@ export default function OrdersScreen() {
   
   // Modal visibility state
   const [isModalVisible, setModalVisible] = useState(false);
+  
+  // Orders state
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Mock data for bits (locations) - formatted for dropdown picker
+  // Load orders on component mount
+  useEffect(() => {
+    const loadOrders = async () => {
+      try {
+        const ordersData = await getOrders();
+        setOrders(ordersData);
+      } catch (error) {
+        console.error('Error loading orders:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadOrders();
+  }, []);
+
+  // Reload orders when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      const loadOrders = async () => {
+        try {
+          const ordersData = await getOrders();
+          setOrders(ordersData);
+        } catch (error) {
+          console.error('Error loading orders:', error);
+        }
+      };
+
+      loadOrders();
+    }, [])
+  );
+
+  // Handle delete button press
+  const handleDeletePress = (order: Order) => {
+    Alert.alert(
+      'Delete Order',
+      `Are you sure you want to delete order ${order.orderNumber}? This action cannot be undone.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteOrder(order.id);
+              // Update local state
+              setOrders(orders.filter(o => o.id !== order.id));
+            } catch (error) {
+              console.error('Error deleting order:', error);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Handle edit button press
+  const handleEditPress = (order: Order) => {
+    router.push({
+      pathname: '/orders/edit-order',
+      params: {
+        orderData: JSON.stringify(order)
+      }
+    });
+  };
+
+  // Get unique bits from actual orders data
   const bits = [
     { label: 'All Bits', value: 'all' },
-    { label: 'Turori', value: 'bit1' },
-    { label: 'Naldurg & Jalkot', value: 'bit2' },
-    { label: 'Gunjoti & Murum', value: 'bit3' },
-    { label: 'Dalimb & Yenegur', value: 'bit4' },
-    { label: 'Sastur & Makhani', value: 'bit5' },
-    { label: 'Narangwadi & Killari', value: 'bit6' },
-    { label: 'Andur', value: 'bit7' },
-    { label: 'Omerga', value: 'bit8' },
-  ];
-
-  // Mock orders data
-  const orders = [
-    {
-      id: 1,
-      counterName: 'Rajesh Kumar',
-      bit: 'Turori',
-      totalItems: 45,
-      totalAmount: 12500,
-      date: '2024-01-15',
-      time: '10:30 AM',
-      status: 'Pending',
-      orderNumber: 'ORD-001',
-    },
-    {
-      id: 2,
-      counterName: 'Priya Sharma',
-      bit: 'Naldurg & Jalkot',
-      totalItems: 32,
-      totalAmount: 8900,
-      date: '2024-01-14',
-      time: '2:15 PM',
-      status: 'Completed',
-      orderNumber: 'ORD-002',
-    },
-    {
-      id: 3,
-      counterName: 'Amit Singh',
-      bit: 'Gunjoti & Murum',
-      totalItems: 28,
-      totalAmount: 7200,
-      date: '2024-01-13',
-      time: '4:45 PM',
-      status: 'Pending',
-      orderNumber: 'ORD-003',
-    },
-    {
-      id: 4,
-      counterName: 'Sneha Patel',
-      bit: 'Dalimb & Yenegur',
-      totalItems: 52,
-      totalAmount: 15600,
-      date: '2024-01-12',
-      time: '11:20 AM',
-      status: 'Completed',
-      orderNumber: 'ORD-004',
-    },
-    {
-      id: 5,
-      counterName: 'Vikram Reddy',
-      bit: 'Sastur & Makhani',
-      totalItems: 38,
-      totalAmount: 9800,
-      date: '2024-01-11',
-      time: '3:30 PM',
-      status: 'Pending',
-      orderNumber: 'ORD-005',
-    },
-    {
-      id: 6,
-      counterName: 'Kunal Kumar',
-      bit: 'Narangwadi & Killari',
-      totalItems: 45,
-      totalAmount: 12500,
-      date: '2024-01-15',
-      time: '10:30 AM',
-      status: 'Pending',
-      orderNumber: 'ORD-006'
-    },
-    {
-      id: 7,
-      counterName: 'Anita Desai',
-      bit: 'Andur',
-      totalItems: 25,
-      totalAmount: 6800,
-      date: '2024-01-10',
-      time: '9:15 AM',
-      status: 'Completed',
-      orderNumber: 'ORD-007'
-    },
-    {
-      id: 8,
-      counterName: 'Rohit Gupta',
-      bit: 'Omerga',
-      totalItems: 33,
-      totalAmount: 9200,
-      date: '2024-01-09',
-      time: '1:45 PM',
-      status: 'Pending',
-      orderNumber: 'ORD-008'
-    }
+    ...Array.from(new Set(orders.map(order => order.bit)))
+      .map(bit => ({ label: bit, value: bit.toLowerCase().replace(/\s+/g, '_') }))
   ];
 
   // Filter orders based on selected bit, search query, and filters
@@ -171,12 +150,6 @@ export default function OrdersScreen() {
     </View>
   );
 
-  const AddOrderButton = () => (
-    <TouchableOpacity style={styles.addButton}>
-      <Ionicons name="add" size={24} color="#ffffff" />
-    </TouchableOpacity>
-  );
-
   const SearchBar = () => (
     <View style={styles.searchContainer}>
       <View style={styles.searchBar}>
@@ -212,8 +185,16 @@ export default function OrdersScreen() {
     { label: 'This Month', value: 'month' },
   ];
 
-  const OrderCard = ({ order }: { order: any }) => (
-    <TouchableOpacity style={styles.orderCard}>
+  const OrderCard = ({ order }: { order: Order }) => (
+    <TouchableOpacity 
+      style={styles.orderCard}
+      onPress={() => router.push({
+        pathname: '/orders/order-details',
+        params: {
+          orderData: JSON.stringify(order)
+        }
+      })}
+    >
       <View style={styles.orderHeader}>
         <View style={styles.orderInfo}>
           <Text style={styles.orderNumber}>{order.orderNumber}</Text>
@@ -233,20 +214,30 @@ export default function OrdersScreen() {
             <Ionicons name="location-outline" size={16} color="#666" />
             <Text style={styles.detailText}>{order.bit}</Text>
           </View>
-          <View style={styles.detailItem}>
-            <Ionicons name="cube-outline" size={16} color="#666" />
-            <Text style={styles.detailText}>{order.totalItems} items</Text>
+          <View style={styles.orderHeaderRight}>
+            <TouchableOpacity 
+              style={styles.editButton}
+              onPress={() => handleEditPress(order)}
+            >
+              <Ionicons name="create-outline" size={18} color="#007AFF" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.deleteButton}
+              onPress={() => handleDeletePress(order)}
+            >
+              <Ionicons name="trash-outline" size={18} color="#FF3B30" />
+            </TouchableOpacity>
           </View>
         </View>
         
         <View style={styles.detailRow}>
           <View style={styles.detailItem}>
-            <Ionicons name="calendar-outline" size={16} color="#666" />
-            <Text style={styles.detailText}>{order.date}</Text>
+            <Ionicons name="cube-outline" size={16} color="#666" />
+            <Text style={styles.detailText}>{order.totalItems} items</Text>
           </View>
           <View style={styles.detailItem}>
-            <Ionicons name="time-outline" size={16} color="#666" />
-            <Text style={styles.detailText}>{order.time}</Text>
+            <Ionicons name="calendar-outline" size={16} color="#666" />
+            <Text style={styles.detailText}>{order.date}</Text>
           </View>
         </View>
       </View>
@@ -257,10 +248,9 @@ export default function OrdersScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       
-      {/* Header with Bits Chooser and Add Button */}
+      {/* Header with Bits Chooser */}
       <View style={styles.header}>
         <BitsChooser />
-        <AddOrderButton />
       </View>
 
       {/* Search Bar */}
@@ -391,6 +381,7 @@ export default function OrdersScreen() {
           </View>
         </View>
       </Modal>
+
     </SafeAreaView>
   );
 }
@@ -450,22 +441,6 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
   },
-  addButton: {
-    backgroundColor: '#007AFF',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#007AFF',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
   searchContainer: {
     paddingHorizontal: 20,
     paddingVertical: 15,
@@ -522,6 +497,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  orderHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  editButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#F0F8FF',
+  },
+  deleteButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#FFF5F5',
   },
   orderInfo: {
     flex: 1,

@@ -1,42 +1,63 @@
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getOrders, Order } from '../../utils/orderStorage';
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   
-  // Mock data for demonstration
+  // State for orders data
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load orders on component mount
+  useEffect(() => {
+    const loadOrders = async () => {
+      try {
+        const ordersData = await getOrders();
+        setOrders(ordersData);
+      } catch (error) {
+        console.error('Error loading orders:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadOrders();
+  }, []);
+
+  // Reload orders when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      const loadOrders = async () => {
+        try {
+          const ordersData = await getOrders();
+          setOrders(ordersData);
+        } catch (error) {
+          console.error('Error loading orders:', error);
+        }
+      };
+
+      loadOrders();
+    }, [])
+  );
+
+  // Calculate stats from real data
   const stats = {
-    totalOrders: 156,
-    totalItems: 1247,
-    pendingOrders: 23,
-    totalBits: 8,
+    totalOrders: orders.length,
+    totalItems: orders.reduce((sum, order) => sum + order.totalItems, 0),
+    pendingOrders: orders.filter(order => order.status === 'Pending').length,
+    totalBits: new Set(orders.map(order => order.bit)).size,
   };
 
-  const recentOrders = [
-    {
-      id: 1,
-      counterName: 'Rajesh Kumar',
-      totalItems: 45,
-      date: '2024-01-15',
-      status: 'Pending',
-    },
-    {
-      id: 2,
-      counterName: 'Priya Sharma',
-      totalItems: 32,
-      date: '2024-01-14',
-      status: 'Completed',
-    },
-    {
-      id: 3,
-      counterName: 'Amit Singh',
-      totalItems: 28,
-      date: '2024-01-13',
-      status: 'Pending',
-    },
-  ];
+  // Get recent orders (last 3)
+  const recentOrders = orders
+    .sort((a, b) => new Date(`${b.date} ${b.time}`).getTime() - new Date(`${a.date} ${a.time}`).getTime())
+    .slice(0, 3);
 
   const StatCard = ({ title, value, icon, color }: { title: string; value: number; icon: string; color: string }) => (
     <View style={[styles.statCard, { borderLeftColor: color }]}>
@@ -50,7 +71,7 @@ export default function DashboardScreen() {
     </View>
   );
 
-  const OrderCard = ({ order }: { order: any }) => (
+  const OrderCard = ({ order }: { order: Order }) => (
     <TouchableOpacity style={styles.orderCard}>
       <View style={styles.orderHeader}>
         <Text style={styles.counterName}>{order.counterName}</Text>
@@ -117,15 +138,27 @@ export default function DashboardScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recent Orders</Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/orders')}>
             <Text style={styles.viewAllText}>View All</Text>
           </TouchableOpacity>
         </View>
         
         <View style={styles.ordersList}>
-          {recentOrders.map((order) => (
-            <OrderCard key={order.id} order={order} />
-          ))}
+          {isLoading ? (
+            <View style={styles.loadingState}>
+              <Text style={styles.loadingText}>Loading orders...</Text>
+            </View>
+          ) : recentOrders.length > 0 ? (
+            recentOrders.map((order) => (
+              <OrderCard key={order.id} order={order} />
+            ))
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="receipt-outline" size={48} color="#ccc" />
+              <Text style={styles.emptyText}>No orders yet</Text>
+              <Text style={styles.emptySubtext}>Create your first order to see it here</Text>
+            </View>
+          )}
         </View>
       </View>
       </ScrollView>
@@ -268,5 +301,29 @@ const styles = StyleSheet.create({
   orderDetailText: {
     fontSize: 14,
     color: '#666666',
+  },
+  loadingState: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666666',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666666',
+    marginTop: 12,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999999',
+    marginTop: 4,
+    textAlign: 'center',
   },
 });

@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React from 'react';
-import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { addOrder } from '../../utils/orderStorage';
 
 interface SelectedItem {
   productId: number;
@@ -14,13 +15,16 @@ interface SelectedItem {
 
 export default function OrderSummaryScreen() {
   const router = useRouter();
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const { 
     retailerName, 
     retailerPhone, 
+    retailerBit,
     orderItems 
   } = useLocalSearchParams<{ 
     retailerName: string;
     retailerPhone: string;
+    retailerBit: string;
     orderItems: string;
   }>();
 
@@ -29,6 +33,44 @@ export default function OrderSummaryScreen() {
 
   const getTotalItems = () => {
     return parsedOrderItems.reduce((total, item) => total + item.quantity, 0);
+  };
+
+  const handleConfirmOrder = async () => {
+    if (parsedOrderItems.length === 0) {
+      Alert.alert('Error', 'Please add items to your order before confirming.');
+      return;
+    }
+
+    setIsCreatingOrder(true);
+    
+    try {
+      const newOrder = await addOrder({
+        counterName: retailerName || 'Unknown Retailer',
+        bit: retailerBit || 'Unknown Bit',
+        totalItems: getTotalItems(),
+        totalAmount: 0, // You can calculate this based on item prices if needed
+        status: 'Pending'
+      }, parsedOrderItems);
+
+      Alert.alert(
+        'Order Confirmed!', 
+        `Order ${newOrder.orderNumber} has been created successfully.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Navigate back to orders screen
+              router.push('/(tabs)/orders');
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error creating order:', error);
+      Alert.alert('Error', 'Failed to create order. Please try again.');
+    } finally {
+      setIsCreatingOrder(false);
+    }
   };
 
   const OrderItemCard = ({ item }: { item: SelectedItem }) => (
@@ -115,13 +157,13 @@ export default function OrderSummaryScreen() {
           <Text style={styles.cancelButtonText}>Back to Order</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={styles.confirmButton}
-          onPress={() => {
-            // TODO: Implement order confirmation logic
-            console.log('Order confirmed:', parsedOrderItems);
-          }}
+          style={[styles.confirmButton, isCreatingOrder && styles.confirmButtonDisabled]}
+          onPress={handleConfirmOrder}
+          disabled={isCreatingOrder}
         >
-          <Text style={styles.confirmButtonText}>Confirm Order</Text>
+          <Text style={styles.confirmButtonText}>
+            {isCreatingOrder ? 'Creating Order...' : 'Confirm Order'}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -315,5 +357,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
     textAlign: 'center',
+  },
+  confirmButtonDisabled: {
+    backgroundColor: '#cccccc',
   },
 });

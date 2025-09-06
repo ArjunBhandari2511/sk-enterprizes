@@ -135,10 +135,11 @@ export default function RetailersScreen() {
     <TouchableOpacity 
       style={styles.retailerCard}
       onPress={() => router.push({
-        pathname: '/new-order',
+        pathname: '/orders/new-order',
         params: { 
           retailerName: retailer.name,
-          retailerPhone: retailer.phone
+          retailerPhone: retailer.phone,
+          retailerBit: retailer.bit
         }
       })}
     >
