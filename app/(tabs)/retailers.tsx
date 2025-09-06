@@ -1,85 +1,85 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { Alert, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { deleteRetailer, getRetailers, Retailer } from '../../utils/retailerStorage';
 
 export default function RetailersScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState('all');
+  const [retailers, setRetailers] = useState<Retailer[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Mock data for bits (locations) - formatted for dropdown picker
+  // Bits options for dropdown picker
   const bits = [
     { label: 'All Bits', value: 'all' },
-    { label: 'Turori', value: 'bit1' },
-    { label: 'Naldurg & Jalkot', value: 'bit2' },
-    { label: 'Gunjoti & Murum', value: 'bit3' },
-    { label: 'Dalimb & Yenegur', value: 'bit4' },
-    { label: 'Sastur & Makhani', value: 'bit5' },
-    { label: 'Narangwadi & Killari', value: 'bit6' },
-    { label: 'Andur', value: 'bit7' },
-    { label: 'Omerga', value: 'bit8' },
+    { label: 'Turori', value: 'Turori' },
+    { label: 'Naldurg & Jalkot', value: 'Naldurg & Jalkot' },
+    { label: 'Gunjoti & Murum', value: 'Gunjoti & Murum' },
+    { label: 'Dalimb & Yenegur', value: 'Dalimb & Yenegur' },
+    { label: 'Sastur & Makhani', value: 'Sastur & Makhani' },
+    { label: 'Narangwadi & Killari', value: 'Narangwadi & Killari' },
+    { label: 'Andur', value: 'Andur' },
+    { label: 'Omerga', value: 'Omerga' },
   ];
 
-  // Mock retailers data
-  const retailers = [
-    {
-      id: 1,
-      name: 'Rajesh Kumar',
-      phone: '+91 98765 43210',
-      bit: 'Turori',
-    },
-    {
-      id: 2,
-      name: 'Priya Sharma',
-      phone: '+91 87654 32109',
-      bit: 'Naldurg & Jalkot',
-    },
-    {
-      id: 3,
-      name: 'Amit Singh',
-      phone: '+91 76543 21098',
-      bit: 'Gunjoti & Murum',
-    },
-    {
-      id: 4,
-      name: 'Sneha Patel',
-      phone: '+91 65432 10987',
-      bit: 'Dalimb & Yenegur',
-    },
-    {
-      id: 5,
-      name: 'Vikram Reddy',
-      phone: '+91 54321 09876',
-      bit: 'Sastur & Makhani',
-    },
-    {
-      id: 6,
-      name: 'Kunal Kumar',
-      phone: '+91 43210 98765',
-      bit: 'Narangwadi & Killari',
-    },
-    {
-      id: 7,
-      name: 'Anita Desai',
-      phone: '+91 32109 87654',
-      bit: 'Andur',
-    },
-    {
-      id: 8,
-      name: 'Rohit Gupta',
-      phone: '+91 21098 76543',
-      bit: 'Omerga',
-    },
-  ];
+  // Load retailers data
+  const loadRetailers = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const retailersData = await getRetailers();
+      setRetailers(retailersData);
+    } catch (error) {
+      console.error('Error loading retailers:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Load retailers on component mount and when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadRetailers();
+    }, [loadRetailers])
+  );
+
+  // Handle delete retailer
+  const handleDeleteRetailer = async (retailer: Retailer) => {
+    Alert.alert(
+      'Delete Retailer',
+      `Are you sure you want to delete ${retailer.name}?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteRetailer(retailer.id);
+              // Reload retailers after deletion
+              await loadRetailers();
+              Alert.alert('Success', 'Retailer deleted successfully');
+            } catch (error) {
+              console.error('Error deleting retailer:', error);
+              Alert.alert('Error', 'Failed to delete retailer. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   // Filter retailers based on selected bit and search query
   const filteredRetailers = retailers.filter(retailer => {
-    const selectedBitName = bits.find(bit => bit.value === value)?.label || 'All Bits';
-    const matchesBit = value === 'all' || retailer.bit === selectedBitName;
+    const matchesBit = value === 'all' || retailer.bit === value;
     const matchesSearch = retailer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          retailer.phone.includes(searchQuery);
     
@@ -131,29 +131,38 @@ export default function RetailersScreen() {
     </View>
   );
 
-  const RetailerCard = ({ retailer }: { retailer: any }) => (
-    <TouchableOpacity 
-      style={styles.retailerCard}
-      onPress={() => router.push({
-        pathname: '/orders/new-order',
-        params: { 
-          retailerName: retailer.name,
-          retailerPhone: retailer.phone,
-          retailerBit: retailer.bit
-        }
-      })}
-    >
-      <View style={styles.retailerHeader}>
-        <View style={styles.retailerInfo}>
-          <Text style={styles.retailerName}>{retailer.name}</Text>
-          <Text style={styles.retailerPhone}>{retailer.phone}</Text>
+  const RetailerCard = ({ retailer }: { retailer: Retailer }) => (
+    <View style={styles.retailerCard}>
+      <TouchableOpacity 
+        style={styles.retailerContent}
+        onPress={() => router.push({
+          pathname: '/orders/new-order',
+          params: { 
+            retailerName: retailer.name,
+            retailerPhone: retailer.phone,
+            retailerBit: retailer.bit
+          }
+        })}
+      >
+        <View style={styles.retailerHeader}>
+          <View style={styles.retailerInfo}>
+            <Text style={styles.retailerName}>{retailer.name}</Text>
+            <Text style={styles.retailerPhone}>{retailer.phone}</Text>
+          </View>
+          <View style={styles.bitBadge}>
+            <Ionicons name="location-outline" size={16} color="#007AFF" />
+            <Text style={styles.bitText}>{retailer.bit}</Text>
+          </View>
         </View>
-        <View style={styles.bitBadge}>
-          <Ionicons name="location-outline" size={16} color="#007AFF" />
-          <Text style={styles.bitText}>{retailer.bit}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+      
+      <TouchableOpacity 
+        style={styles.deleteButton}
+        onPress={() => handleDeleteRetailer(retailer)}
+      >
+        <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+      </TouchableOpacity>
+    </View>
   );
 
   return (
@@ -174,21 +183,31 @@ export default function RetailersScreen() {
           <Text style={styles.retailersTitle}>
             Retailers ({filteredRetailers.length})
           </Text>
+          <TouchableOpacity 
+            style={styles.addButton}
+            onPress={() => router.push('/retailers/new-retailer')}
+          >
+            <Ionicons name="add" size={24} color="#007AFF" />
+          </TouchableOpacity>
         </View>
         
         <View style={styles.retailersList}>
-          {filteredRetailers.map((retailer) => (
-            <RetailerCard key={retailer.id} retailer={retailer} />
-          ))}
+          {isLoading ? (
+            <View style={styles.loadingState}>
+              <Text style={styles.loadingText}>Loading retailers...</Text>
+            </View>
+          ) : filteredRetailers.length > 0 ? (
+            filteredRetailers.map((retailer) => (
+              <RetailerCard key={retailer.id} retailer={retailer} />
+            ))
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="storefront-outline" size={64} color="#ccc" />
+              <Text style={styles.emptyText}>No retailers found</Text>
+              <Text style={styles.emptySubtext}>Try adjusting your search or bit selection</Text>
+            </View>
+          )}
         </View>
-        
-        {filteredRetailers.length === 0 && (
-          <View style={styles.emptyState}>
-            <Ionicons name="storefront-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>No retailers found</Text>
-            <Text style={styles.emptySubtext}>Try adjusting your search or bit selection</Text>
-          </View>
-        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -273,12 +292,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   retailersHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 15,
   },
   retailersTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#1a1a1a',
+  },
+  addButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f8ff',
   },
   retailersList: {
     gap: 12,
@@ -287,7 +314,8 @@ const styles = StyleSheet.create({
   retailerCard: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
-    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -296,6 +324,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  retailerContent: {
+    flex: 1,
+    padding: 16,
   },
   retailerHeader: {
     flexDirection: 'row',
@@ -329,6 +361,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#007AFF',
   },
+  deleteButton: {
+    padding: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,
@@ -344,5 +381,13 @@ const styles = StyleSheet.create({
     color: '#999999',
     marginTop: 4,
     textAlign: 'center',
+  },
+  loadingState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666666',
   },
 });
