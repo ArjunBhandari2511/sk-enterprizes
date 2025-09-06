@@ -1,0 +1,701 @@
+import { Ionicons } from '@expo/vector-icons';
+import React, { useState } from 'react';
+import { Dimensions, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import DropDownPicker from 'react-native-dropdown-picker';
+import Modal from 'react-native-modal';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const { height: screenHeight, width: screenWidth } = Dimensions.get('screen');
+
+export default function OrdersScreen() {
+  const insets = useSafeAreaInsets();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState('all');
+  
+  // Filter states
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
+  
+  // Modal visibility state
+  const [isModalVisible, setModalVisible] = useState(false);
+
+  // Mock data for bits (locations) - formatted for dropdown picker
+  const bits = [
+    { label: 'All Bits', value: 'all' },
+    { label: 'Turori', value: 'bit1' },
+    { label: 'Naldurg & Jalkot', value: 'bit2' },
+    { label: 'Gunjoti & Murum', value: 'bit3' },
+    { label: 'Dalimb & Yenegur', value: 'bit4' },
+    { label: 'Sastur & Makhani', value: 'bit5' },
+    { label: 'Narangwadi & Killari', value: 'bit6' },
+    { label: 'Andur', value: 'bit7' },
+    { label: 'Omerga', value: 'bit8' },
+  ];
+
+  // Mock orders data
+  const orders = [
+    {
+      id: 1,
+      counterName: 'Rajesh Kumar',
+      bit: 'Turori',
+      totalItems: 45,
+      totalAmount: 12500,
+      date: '2024-01-15',
+      time: '10:30 AM',
+      status: 'Pending',
+      orderNumber: 'ORD-001',
+    },
+    {
+      id: 2,
+      counterName: 'Priya Sharma',
+      bit: 'Naldurg & Jalkot',
+      totalItems: 32,
+      totalAmount: 8900,
+      date: '2024-01-14',
+      time: '2:15 PM',
+      status: 'Completed',
+      orderNumber: 'ORD-002',
+    },
+    {
+      id: 3,
+      counterName: 'Amit Singh',
+      bit: 'Gunjoti & Murum',
+      totalItems: 28,
+      totalAmount: 7200,
+      date: '2024-01-13',
+      time: '4:45 PM',
+      status: 'Pending',
+      orderNumber: 'ORD-003',
+    },
+    {
+      id: 4,
+      counterName: 'Sneha Patel',
+      bit: 'Dalimb & Yenegur',
+      totalItems: 52,
+      totalAmount: 15600,
+      date: '2024-01-12',
+      time: '11:20 AM',
+      status: 'Completed',
+      orderNumber: 'ORD-004',
+    },
+    {
+      id: 5,
+      counterName: 'Vikram Reddy',
+      bit: 'Sastur & Makhani',
+      totalItems: 38,
+      totalAmount: 9800,
+      date: '2024-01-11',
+      time: '3:30 PM',
+      status: 'Pending',
+      orderNumber: 'ORD-005',
+    },
+    {
+      id: 6,
+      counterName: 'Kunal Kumar',
+      bit: 'Narangwadi & Killari',
+      totalItems: 45,
+      totalAmount: 12500,
+      date: '2024-01-15',
+      time: '10:30 AM',
+      status: 'Pending',
+      orderNumber: 'ORD-006'
+    },
+    {
+      id: 7,
+      counterName: 'Anita Desai',
+      bit: 'Andur',
+      totalItems: 25,
+      totalAmount: 6800,
+      date: '2024-01-10',
+      time: '9:15 AM',
+      status: 'Completed',
+      orderNumber: 'ORD-007'
+    },
+    {
+      id: 8,
+      counterName: 'Rohit Gupta',
+      bit: 'Omerga',
+      totalItems: 33,
+      totalAmount: 9200,
+      date: '2024-01-09',
+      time: '1:45 PM',
+      status: 'Pending',
+      orderNumber: 'ORD-008'
+    }
+  ];
+
+  // Filter orders based on selected bit, search query, and filters
+  const filteredOrders = orders.filter(order => {
+    const selectedBitName = bits.find(bit => bit.value === value)?.label || 'All Bits';
+    const matchesBit = value === 'all' || order.bit === selectedBitName;
+    const matchesSearch = order.counterName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Status filter
+    const matchesStatus = statusFilter === 'all' || order.status.toLowerCase() === statusFilter.toLowerCase();
+    
+    // Date filter (simplified - you can enhance this)
+    const matchesDate = dateFilter === 'all' || true; // Add date logic here
+    
+    return matchesBit && matchesSearch && matchesStatus && matchesDate;
+  });
+
+  const BitsChooser = () => (
+    <View style={styles.bitsChooserContainer}>
+      <DropDownPicker
+        open={open}
+        value={value}
+        items={bits}
+        setOpen={setOpen}
+        setValue={setValue}
+        placeholder="Select Bit"
+        style={styles.dropdownPicker}
+        dropDownContainerStyle={styles.dropdownContainer}
+        textStyle={styles.dropdownText}
+        arrowIconStyle={styles.arrowIcon}
+        tickIconStyle={styles.tickIcon}
+        zIndex={3000}
+        zIndexInverse={1000}
+        dropDownDirection="BOTTOM"
+        closeAfterSelecting={true}
+        showTickIcon={true}
+        showArrowIcon={true}
+        searchable={false}
+        listMode="FLATLIST"
+        maxHeight={400}
+        flatListProps={{
+          initialNumToRender: 9,
+        }}
+      />
+    </View>
+  );
+
+  const AddOrderButton = () => (
+    <TouchableOpacity style={styles.addButton}>
+      <Ionicons name="add" size={24} color="#ffffff" />
+    </TouchableOpacity>
+  );
+
+  const SearchBar = () => (
+    <View style={styles.searchContainer}>
+      <View style={styles.searchBar}>
+        <Ionicons name="search-outline" size={20} color="#666" />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search orders..."
+          placeholderTextColor="#999"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        <TouchableOpacity 
+          style={styles.filterButton}
+          onPress={() => setModalVisible(true)}
+        >
+          <Ionicons name="filter-outline" size={20} color="#666" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  // Filter options data
+  const statusOptions = [
+    { label: 'All Status', value: 'all' },
+    { label: 'Pending', value: 'pending' },
+    { label: 'Completed', value: 'completed' },
+  ];
+
+  const dateOptions = [
+    { label: 'All Dates', value: 'all' },
+    { label: 'Today', value: 'today' },
+    { label: 'This Week', value: 'week' },
+    { label: 'This Month', value: 'month' },
+  ];
+
+  const OrderCard = ({ order }: { order: any }) => (
+    <TouchableOpacity style={styles.orderCard}>
+      <View style={styles.orderHeader}>
+        <View style={styles.orderInfo}>
+          <Text style={styles.orderNumber}>{order.orderNumber}</Text>
+          <Text style={styles.counterName}>{order.counterName}</Text>
+        </View>
+        <View style={[
+          styles.statusBadge,
+          { backgroundColor: order.status === 'Completed' ? '#4CAF50' : '#FF9800' }
+        ]}>
+          <Text style={styles.statusText}>{order.status}</Text>
+        </View>
+      </View>
+      
+      <View style={styles.orderDetails}>
+        <View style={styles.detailRow}>
+          <View style={styles.detailItem}>
+            <Ionicons name="location-outline" size={16} color="#666" />
+            <Text style={styles.detailText}>{order.bit}</Text>
+          </View>
+          <View style={styles.detailItem}>
+            <Ionicons name="cube-outline" size={16} color="#666" />
+            <Text style={styles.detailText}>{order.totalItems} items</Text>
+          </View>
+        </View>
+        
+        <View style={styles.detailRow}>
+          <View style={styles.detailItem}>
+            <Ionicons name="calendar-outline" size={16} color="#666" />
+            <Text style={styles.detailText}>{order.date}</Text>
+          </View>
+          <View style={styles.detailItem}>
+            <Ionicons name="time-outline" size={16} color="#666" />
+            <Text style={styles.detailText}>{order.time}</Text>
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      
+      {/* Header with Bits Chooser and Add Button */}
+      <View style={styles.header}>
+        <BitsChooser />
+        <AddOrderButton />
+      </View>
+
+      {/* Search Bar */}
+      <SearchBar />
+
+      {/* Orders List */}
+      <ScrollView style={styles.ordersContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.ordersHeader}>
+          <Text style={styles.ordersTitle}>
+            Orders ({filteredOrders.length})
+          </Text>
+        </View>
+        
+        <View style={styles.ordersList}>
+          {filteredOrders.map((order) => (
+            <OrderCard key={order.id} order={order} />
+          ))}
+        </View>
+        
+        {filteredOrders.length === 0 && (
+          <View style={styles.emptyState}>
+            <Ionicons name="receipt-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyText}>No orders found</Text>
+            <Text style={styles.emptySubtext}>Try adjusting your search or bit selection</Text>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* FIXED Filter Modal with Custom Backdrop */}
+      <Modal
+        isVisible={isModalVisible}
+        animationIn="slideInUp"
+        animationOut="slideOutDown"
+        style={styles.modal}
+        hasBackdrop={false} // Disable default backdrop - KEY CHANGE
+        coverScreen={true}
+        deviceHeight={screenHeight}
+        deviceWidth={screenWidth}
+        statusBarTranslucent={true}
+        useNativeDriverForBackdrop={true}
+        hideModalContentWhileAnimating={false}
+      >
+        {/* Custom Backdrop that covers entire screen including status bar */}
+        <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
+          <View style={styles.customBackdrop} />
+        </TouchableWithoutFeedback>
+
+        {/* Modal Content */}
+        <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Filter Orders</Text>
+            <TouchableOpacity 
+              onPress={() => setModalVisible(false)}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.modalBody}>
+            {/* Status Filter */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Status</Text>
+              <View style={styles.filterOptions}>
+                {statusOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.filterOption,
+                      statusFilter === option.value && styles.filterOptionSelected
+                    ]}
+                    onPress={() => setStatusFilter(option.value)}
+                  >
+                    <Text style={[
+                      styles.filterOptionText,
+                      statusFilter === option.value && styles.filterOptionTextSelected
+                    ]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Date Filter */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Date Range</Text>
+              <View style={styles.filterOptions}>
+                {dateOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.filterOption,
+                      dateFilter === option.value && styles.filterOptionSelected
+                    ]}
+                    onPress={() => setDateFilter(option.value)}
+                  >
+                    <Text style={[
+                      styles.filterOptionText,
+                      dateFilter === option.value && styles.filterOptionTextSelected
+                    ]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+          </ScrollView>
+
+          {/* Action Buttons */}
+          <View style={styles.filterActions}>
+            <TouchableOpacity 
+              style={styles.clearButton}
+              onPress={() => {
+                setStatusFilter('all');
+                setDateFilter('all');
+              }}
+            >
+              <Text style={styles.clearButtonText}>Clear All</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.applyButton}
+              onPress={() => setModalVisible(false)}
+            >
+              <Text style={styles.applyButtonText}>Apply Filters</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5ea',
+  },
+  bitsChooserContainer: {
+    position: 'relative',
+    zIndex: 1000,
+    width: '60%',
+  },
+  dropdownPicker: {
+    backgroundColor: '#f0f8ff',
+    borderColor: '#007AFF',
+    borderWidth: 1,
+    borderRadius: 20,
+    minHeight: 40,
+  },
+  dropdownContainer: {
+    backgroundColor: '#ffffff',
+    borderColor: '#e5e5ea',
+    borderWidth: 1,
+    borderRadius: 12,
+    marginTop: 5,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+  },
+  dropdownText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  arrowIcon: {
+    width: 16,
+    height: 16,
+  },
+  tickIcon: {
+    width: 16,
+    height: 16,
+  },
+  addButton: {
+    backgroundColor: '#007AFF',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#007AFF',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  searchContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: '#ffffff',
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 25,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    marginLeft: 10,
+  },
+  filterButton: {
+    padding: 5,
+  },
+  ordersContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  ordersHeader: {
+    paddingVertical: 15,
+  },
+  ordersTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+  },
+  ordersList: {
+    gap: 12,
+    paddingBottom: 20,
+  },
+  orderCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  orderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  orderInfo: {
+    flex: 1,
+  },
+  orderNumber: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#007AFF',
+    marginBottom: 2,
+  },
+  counterName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  orderDetails: {
+    gap: 8,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  detailText: {
+    fontSize: 14,
+    color: '#666666',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#666666',
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999999',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  // FIXED Modal Styles
+  modal: {
+    justifyContent: 'flex-end',
+    margin: 0,
+    padding: 0,
+  },
+  // Custom backdrop that covers entire screen
+  customBackdrop: {
+    position: 'absolute',
+    top: StatusBar.currentHeight ? -StatusBar.currentHeight : 0, // Extend above status bar on Android
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    zIndex: 0,
+  },
+  modalContent: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    minHeight: '50%',
+    zIndex: 1, // Ensure content is above backdrop
+    position: 'relative',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5ea',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+  },
+  closeButton: {
+    padding: 5,
+  },
+  modalBody: {
+    maxHeight: 400,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  filterSection: {
+    marginBottom: 20,
+  },
+  filterSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333333',
+    marginBottom: 10,
+  },
+  filterOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  filterOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e5e5ea',
+    backgroundColor: '#ffffff',
+  },
+  filterOptionSelected: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  filterOptionText: {
+    fontSize: 14,
+    color: '#666666',
+    fontWeight: '500',
+  },
+  filterOptionTextSelected: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  filterActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  clearButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e5ea',
+    backgroundColor: '#ffffff',
+    marginRight: 10,
+  },
+  clearButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666666',
+    textAlign: 'center',
+  },
+  applyButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
+    marginLeft: 10,
+  },
+  applyButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+});
