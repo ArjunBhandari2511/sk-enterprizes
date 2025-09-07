@@ -59,6 +59,17 @@ export default function TabLayout() {
           headerTitle: 'Retailers',
         }}
       />
+      <Tabs.Screen
+        name="items"
+        options={{
+          title: 'Items',
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="cube-outline" size={size} color={color} />
+          ),
+          headerTitle: 'Items',
+        }}
+      />
     </Tabs>
   );
 }

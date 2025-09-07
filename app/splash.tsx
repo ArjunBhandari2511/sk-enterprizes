@@ -1,16 +1,22 @@
-import { router } from "expo-router";
-import React, { useEffect } from "react";
+import { Redirect } from "expo-router";
+import React, { useEffect, useState } from "react";
 import { StatusBar, StyleSheet, Text, View } from "react-native";
 
 export default function SplashScreen() {
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+
   useEffect(() => {
     // Navigate to tabs after 2 seconds
     const timer = setTimeout(() => {
-      router.replace('/(tabs)');
+      setShouldRedirect(true);
     }, 2000);
 
     return () => clearTimeout(timer);
   }, []);
+
+  if (shouldRedirect) {
+    return <Redirect href="/(tabs)" />;
+  }
 
   return (
     <View style={styles.container}>
