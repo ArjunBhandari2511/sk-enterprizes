@@ -99,6 +99,18 @@ export const getRetailerById = async (id: number): Promise<Retailer | null> => {
   }
 };
 
+// Get unique bits from all retailers
+export const getUniqueBits = async (): Promise<string[]> => {
+  try {
+    const retailers = await getRetailers();
+    const uniqueBits = Array.from(new Set(retailers.map(r => r.bit)));
+    return uniqueBits.sort();
+  } catch (error) {
+    console.error('Error getting unique bits:', error);
+    return [];
+  }
+};
+
 // Get retailers by bit
 export const getRetailersByBit = async (bit: string): Promise<Retailer[]> => {
   try {

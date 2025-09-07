@@ -28,10 +28,24 @@ export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Bits options for dropdown picker (same as retailers.tsx)
+  const bits = [
+    { label: 'All Bits', value: 'all' },
+    { label: 'Turori', value: 'Turori' },
+    { label: 'Naldurg & Jalkot', value: 'Naldurg & Jalkot' },
+    { label: 'Gunjoti & Murum', value: 'Gunjoti & Murum' },
+    { label: 'Dalimb & Yenegur', value: 'Dalimb & Yenegur' },
+    { label: 'Sastur & Makhani', value: 'Sastur & Makhani' },
+    { label: 'Narangwadi & Killari', value: 'Narangwadi & Killari' },
+    { label: 'Andur', value: 'Andur' },
+    { label: 'Omerga', value: 'Omerga' },
+  ];
+
   // Load orders on component mount
   useEffect(() => {
     const loadOrders = async () => {
       try {
+        setIsLoading(true);
         const ordersData = await getOrders();
         setOrders(ordersData);
       } catch (error) {
@@ -97,17 +111,9 @@ export default function OrdersScreen() {
     });
   };
 
-  // Get unique bits from actual orders data
-  const bits = [
-    { label: 'All Bits', value: 'all' },
-    ...Array.from(new Set(orders.map(order => order.bit)))
-      .map(bit => ({ label: bit, value: bit.toLowerCase().replace(/\s+/g, '_') }))
-  ];
-
   // Filter orders based on selected bit, search query, and filters
   const filteredOrders = orders.filter(order => {
-    const selectedBitName = bits.find(bit => bit.value === value)?.label || 'All Bits';
-    const matchesBit = value === 'all' || order.bit === selectedBitName;
+    const matchesBit = value === 'all' || order.bit === value;
     const matchesSearch = order.counterName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase());
     

@@ -14,10 +14,23 @@ export default function DashboardScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Bits options (same as retailers.tsx)
+  const bits = [
+    'Turori',
+    'Naldurg & Jalkot',
+    'Gunjoti & Murum',
+    'Dalimb & Yenegur',
+    'Sastur & Makhani',
+    'Narangwadi & Killari',
+    'Andur',
+    'Omerga',
+  ];
+
   // Load orders on component mount
   useEffect(() => {
     const loadOrders = async () => {
       try {
+        setIsLoading(true);
         const ordersData = await getOrders();
         setOrders(ordersData);
       } catch (error) {
@@ -51,7 +64,7 @@ export default function DashboardScreen() {
     totalOrders: orders.length,
     totalItems: orders.reduce((sum, order) => sum + order.totalItems, 0),
     pendingOrders: orders.filter(order => order.status === 'Pending').length,
-    totalBits: new Set(orders.map(order => order.bit)).size,
+    totalBits: bits.length, // Use hardcoded bits count (same as retailers.tsx)
   };
 
   // Get recent orders (last 3)
