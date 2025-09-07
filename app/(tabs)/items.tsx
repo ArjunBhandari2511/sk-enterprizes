@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { deleteProduct, getProducts, getUniqueBrandNames, Product } from '../../utils/productStorage';
+import { api, Product } from '../../utils/api';
 
 export default function ItemsScreen() {
   const router = useRouter();
@@ -21,8 +21,8 @@ export default function ItemsScreen() {
     try {
       setIsLoading(true);
       const [productsData, brandNames] = await Promise.all([
-        getProducts(),
-        getUniqueBrandNames()
+        api.products.getAll(selectedBrand === 'all' ? undefined : selectedBrand, searchQuery || undefined),
+        api.products.getUniqueBrandNames()
       ]);
       
       setProducts(productsData);
@@ -35,10 +35,11 @@ export default function ItemsScreen() {
       setBrandOptions(options);
     } catch (error) {
       console.error('Error loading data:', error);
+      Alert.alert('Error', 'Failed to load products. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [selectedBrand, searchQuery]);
 
   // Load data on component mount
   useEffect(() => {
@@ -67,7 +68,7 @@ export default function ItemsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteProduct(product.id);
+              await api.products.delete(product._id);
               // Reload products after deletion
               await loadData();
               Alert.alert('Success', 'Product deleted successfully');
@@ -81,14 +82,8 @@ export default function ItemsScreen() {
     );
   };
 
-  // Filter products based on selected brand and search query
-  const filteredProducts = products.filter(product => {
-    const matchesBrand = selectedBrand === 'all' || product.brandName === selectedBrand;
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         product.brandName.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    return matchesBrand && matchesSearch;
-  });
+  // Since we're now filtering on the server side, we can use products directly
+  const filteredProducts = products;
 
   const BrandFilter = () => (
     <View style={styles.brandFilterContainer}>
@@ -202,7 +197,7 @@ export default function ItemsScreen() {
             </View>
           ) : filteredProducts.length > 0 ? (
             filteredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <ProductCard key={product._id} product={product} />
             ))
           ) : (
             <View style={styles.emptyState}>

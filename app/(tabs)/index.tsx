@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getOrders, Order } from '../../utils/orderStorage';
+import { api, Order } from '../../utils/api';
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
@@ -31,7 +31,7 @@ export default function DashboardScreen() {
     const loadOrders = async () => {
       try {
         setIsLoading(true);
-        const ordersData = await getOrders();
+        const ordersData = await api.orders.getAll();
         setOrders(ordersData);
       } catch (error) {
         console.error('Error loading orders:', error);
@@ -48,7 +48,7 @@ export default function DashboardScreen() {
     useCallback(() => {
       const loadOrders = async () => {
         try {
-          const ordersData = await getOrders();
+          const ordersData = await api.orders.getAll();
           setOrders(ordersData);
         } catch (error) {
           console.error('Error loading orders:', error);
@@ -163,7 +163,7 @@ export default function DashboardScreen() {
             </View>
           ) : recentOrders.length > 0 ? (
             recentOrders.map((order) => (
-              <OrderCard key={order.id} order={order} />
+              <OrderCard key={order._id} order={order} />
             ))
           ) : (
             <View style={styles.emptyState}>

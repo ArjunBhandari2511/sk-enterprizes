@@ -3,8 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Order, OrderItem, updateOrder } from '../../utils/orderStorage';
-import { Brand, getBrands, getProducts, initializeProductData, Product } from '../../utils/productStorage';
+import { api, Brand, Order, OrderItem, Product } from '../../utils/api';
 
 export default function EditOrderScreen() {
   const router = useRouter();
@@ -39,15 +38,15 @@ export default function EditOrderScreen() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        await initializeProductData();
         const [productsData, brandsData] = await Promise.all([
-          getProducts(),
-          getBrands()
+          api.products.getAll(),
+          api.brands.getAll()
         ]);
         setProducts(productsData);
         setBrands(brandsData);
       } catch (error) {
         console.error('Error loading products and brands:', error);
+        Alert.alert('Error', 'Failed to load data. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -57,11 +56,11 @@ export default function EditOrderScreen() {
   }, []);
 
 
-  const getBrandProducts = (brandId: number) => {
+  const getBrandProducts = (brandId: string) => {
     return products.filter(product => product.brandId === brandId);
   };
 
-  const getBrandProductCount = (brandId: number) => {
+  const getBrandProductCount = (brandId: string) => {
     return products.filter(product => product.brandId === brandId).length;
   };
 
@@ -73,7 +72,7 @@ export default function EditOrderScreen() {
   const handleAddToOrder = (product: Product, unit: 'Pc' | 'Outer' | 'Case', quantity: number) => {
     setOrderItems(prevItems => {
       const existingItemIndex = prevItems.findIndex(
-        item => item.productId === product.id && item.unit === unit
+        item => item.productId === product._id && item.unit === unit
       );
 
       if (existingItemIndex >= 0) {
@@ -84,7 +83,7 @@ export default function EditOrderScreen() {
       } else {
         // Add new item
         const newItem: OrderItem = {
-          productId: product.id,
+          productId: product._id,
           productName: product.name,
           brandName: selectedBrand?.name || 'Unknown Brand',
           unit,
@@ -95,7 +94,7 @@ export default function EditOrderScreen() {
     });
   };
 
-  const handleUpdateQuantity = (productId: number, unit: 'Pc' | 'Outer' | 'Case', newQuantity: number) => {
+  const handleUpdateQuantity = (productId: string, unit: 'Pc' | 'Outer' | 'Case', newQuantity: number) => {
     setOrderItems(prevItems => {
       const updatedItems = prevItems.map(item => {
         if (item.productId === productId && item.unit === unit) {
@@ -109,7 +108,7 @@ export default function EditOrderScreen() {
     });
   };
 
-  const handleRemoveItem = (productId: number, unit: 'Pc' | 'Outer' | 'Case') => {
+  const handleRemoveItem = (productId: string, unit: 'Pc' | 'Outer' | 'Case') => {
     setOrderItems(prevItems => 
       prevItems.filter(item => !(item.productId === productId && item.unit === unit))
     );
@@ -132,7 +131,7 @@ export default function EditOrderScreen() {
     try {
       const totalItems = orderItems.reduce((total, item) => total + item.quantity, 0);
       
-      await updateOrder(order.id, {
+      await api.orders.update(order._id, {
         items: orderItems,
         totalItems: totalItems,
         // Update the order with current items
@@ -179,7 +178,7 @@ export default function EditOrderScreen() {
             try {
               const totalItems = orderItems.reduce((total, item) => total + item.quantity, 0);
               
-              await updateOrder(order.id, {
+              await api.orders.update(order._id, {
                 items: orderItems,
                 totalItems: totalItems,
                 status: 'Completed',
@@ -211,9 +210,9 @@ export default function EditOrderScreen() {
   };
 
   const ProductModal = () => {
-    const [productSelections, setProductSelections] = useState<{[key: number]: {unit: 'Pc' | 'Outer' | 'Case', quantity: number}}>({});
+    const [productSelections, setProductSelections] = useState<{[key: string]: {unit: 'Pc' | 'Outer' | 'Case', quantity: number}}>({});
 
-    const handleUnitChange = (productId: number, unit: 'Pc' | 'Outer' | 'Case') => {
+    const handleUnitChange = (productId: string, unit: 'Pc' | 'Outer' | 'Case') => {
       setProductSelections(prev => ({
         ...prev,
         [productId]: {
@@ -223,7 +222,7 @@ export default function EditOrderScreen() {
       }));
     };
 
-    const handleQuantityChange = (productId: number, quantity: number) => {
+    const handleQuantityChange = (productId: string, quantity: number) => {
       setProductSelections(prev => ({
         ...prev,
         [productId]: {
@@ -236,7 +235,7 @@ export default function EditOrderScreen() {
     const handleAddSelected = () => {
       Object.entries(productSelections).forEach(([productId, selection]) => {
         if (selection.quantity > 0) {
-          const product = products.find(p => p.id === parseInt(productId));
+          const product = products.find(p => p._id === productId);
           if (product) {
             handleAddToOrder(product, selection.unit, selection.quantity);
           }
@@ -246,7 +245,7 @@ export default function EditOrderScreen() {
       setProductSelections({});
     };
 
-    const brandProducts = selectedBrand ? getBrandProducts(selectedBrand.id) : [];
+    const brandProducts = selectedBrand ? getBrandProducts(selectedBrand._id) : [];
 
     return (
       <Modal
@@ -278,7 +277,7 @@ export default function EditOrderScreen() {
           {/* Products List */}
           <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
             {brandProducts.map((product) => (
-              <View key={product.id} style={styles.productItem}>
+              <View key={product._id} style={styles.productItem}>
                 {/* Product Name */}
                 <Text style={styles.productName}>{product.name}</Text>
                 
@@ -291,13 +290,13 @@ export default function EditOrderScreen() {
                         key={unit}
                         style={[
                           styles.unitButton,
-                          productSelections[product.id]?.unit === unit && styles.unitButtonSelected
+                          productSelections[product._id]?.unit === unit && styles.unitButtonSelected
                         ]}
-                        onPress={() => handleUnitChange(product.id, unit)}
+                        onPress={() => handleUnitChange(product._id, unit)}
                       >
                         <Text style={[
                           styles.unitText,
-                          productSelections[product.id]?.unit === unit && styles.unitTextSelected
+                          productSelections[product._id]?.unit === unit && styles.unitTextSelected
                         ]}>
                           {unit}
                         </Text>
@@ -310,33 +309,33 @@ export default function EditOrderScreen() {
                     <TouchableOpacity
                       style={[
                         styles.quantityControls,
-                        (productSelections[product.id]?.quantity || 0) > 0 && styles.quantityControlsSelected
+                        (productSelections[product._id]?.quantity || 0) > 0 && styles.quantityControlsSelected
                       ]}
                     >
                       <TouchableOpacity
                         style={styles.quantityButton}
-                        onPress={() => handleQuantityChange(product.id, (productSelections[product.id]?.quantity || 0) - 1)}
+                        onPress={() => handleQuantityChange(product._id, (productSelections[product._id]?.quantity || 0) - 1)}
                       >
                         <Ionicons 
                           name="remove" 
                           size={16} 
-                          color={(productSelections[product.id]?.quantity || 0) > 0 ? "#ffffff" : "#8B5CF6"} 
+                          color={(productSelections[product._id]?.quantity || 0) > 0 ? "#ffffff" : "#8B5CF6"} 
                         />
                       </TouchableOpacity>
                       <Text style={[
                         styles.quantityText,
-                        (productSelections[product.id]?.quantity || 0) > 0 && styles.quantityTextSelected
+                        (productSelections[product._id]?.quantity || 0) > 0 && styles.quantityTextSelected
                       ]}>
-                        {productSelections[product.id]?.quantity || 0}
+                        {productSelections[product._id]?.quantity || 0}
                       </Text>
                       <TouchableOpacity
                         style={styles.quantityButton}
-                        onPress={() => handleQuantityChange(product.id, (productSelections[product.id]?.quantity || 0) + 1)}
+                        onPress={() => handleQuantityChange(product._id, (productSelections[product._id]?.quantity || 0) + 1)}
                       >
                         <Ionicons 
                           name="add" 
                           size={16} 
-                          color={(productSelections[product.id]?.quantity || 0) ? "#ffffff" : "#8B5CF6"} 
+                          color={(productSelections[product._id]?.quantity || 0) ? "#ffffff" : "#8B5CF6"} 
                         />
                       </TouchableOpacity>
                     </TouchableOpacity>
@@ -392,7 +391,7 @@ export default function EditOrderScreen() {
       <Image source={{ uri: brand.image }} style={styles.brandImage} />
       <View style={styles.brandInfo}>
         <Text style={styles.brandName}>{brand.name}</Text>
-        <Text style={styles.productCount}>{getBrandProductCount(brand.id)} Products</Text>
+        <Text style={styles.productCount}>{getBrandProductCount(brand._id)} Products</Text>
       </View>
       <Ionicons name="chevron-forward" size={20} color="#666" />
     </TouchableOpacity>
@@ -491,7 +490,7 @@ export default function EditOrderScreen() {
           ) : (
             <View style={styles.brandsList}>
               {brands.map((brand) => (
-                <BrandCard key={brand.id} brand={brand} />
+                <BrandCard key={brand._id} brand={brand} />
               ))}
             </View>
           )}

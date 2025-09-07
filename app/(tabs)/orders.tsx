@@ -6,7 +6,7 @@ import { Alert, Dimensions, ScrollView, StatusBar, StyleSheet, Text, TextInput, 
 import DropDownPicker from 'react-native-dropdown-picker';
 import Modal from 'react-native-modal';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { deleteOrder, getOrders, Order } from '../../utils/orderStorage';
+import { api, Order } from '../../utils/api';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('screen');
 
@@ -28,7 +28,7 @@ export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Bits options for dropdown picker (same as retailers.tsx)
+  // Bits options for dropdown picker
   const bits = [
     { label: 'All Bits', value: 'all' },
     { label: 'Turori', value: 'Turori' },
@@ -46,24 +46,33 @@ export default function OrdersScreen() {
     const loadOrders = async () => {
       try {
         setIsLoading(true);
-        const ordersData = await getOrders();
+        const ordersData = await api.orders.getAll(
+          value === 'all' ? undefined : value,
+          statusFilter === 'all' ? undefined : statusFilter,
+          searchQuery || undefined
+        );
         setOrders(ordersData);
       } catch (error) {
         console.error('Error loading orders:', error);
+        Alert.alert('Error', 'Failed to load orders. Please try again.');
       } finally {
         setIsLoading(false);
       }
     };
 
     loadOrders();
-  }, []);
+  }, [value, statusFilter, searchQuery]);
 
   // Reload orders when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       const loadOrders = async () => {
         try {
-          const ordersData = await getOrders();
+          const ordersData = await api.orders.getAll(
+            value === 'all' ? undefined : value,
+            statusFilter === 'all' ? undefined : statusFilter,
+            searchQuery || undefined
+          );
           setOrders(ordersData);
         } catch (error) {
           console.error('Error loading orders:', error);
@@ -71,7 +80,7 @@ export default function OrdersScreen() {
       };
 
       loadOrders();
-    }, [])
+    }, [value, statusFilter, searchQuery])
   );
 
   // Handle delete button press
@@ -89,11 +98,12 @@ export default function OrdersScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteOrder(order.id);
+              await api.orders.delete(order._id);
               // Update local state
-              setOrders(orders.filter(o => o.id !== order.id));
+              setOrders(orders.filter(o => o._id !== order._id));
             } catch (error) {
               console.error('Error deleting order:', error);
+              Alert.alert('Error', 'Failed to delete order. Please try again.');
             }
           },
         },
@@ -111,20 +121,7 @@ export default function OrdersScreen() {
     });
   };
 
-  // Filter orders based on selected bit, search query, and filters
-  const filteredOrders = orders.filter(order => {
-    const matchesBit = value === 'all' || order.bit === value;
-    const matchesSearch = order.counterName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    // Status filter
-    const matchesStatus = statusFilter === 'all' || order.status.toLowerCase() === statusFilter.toLowerCase();
-    
-    // Date filter (simplified - you can enhance this)
-    const matchesDate = dateFilter === 'all' || true; // Add date logic here
-    
-    return matchesBit && matchesSearch && matchesStatus && matchesDate;
-  });
+  const filteredOrders = orders;
 
   const BitsChooser = () => (
     <View style={styles.bitsChooserContainer}>
@@ -272,7 +269,7 @@ export default function OrdersScreen() {
         
         <View style={styles.ordersList}>
           {filteredOrders.map((order) => (
-            <OrderCard key={order.id} order={order} />
+            <OrderCard key={order._id} order={order} />
           ))}
         </View>
         
@@ -285,13 +282,13 @@ export default function OrdersScreen() {
         )}
       </ScrollView>
 
-      {/* FIXED Filter Modal with Custom Backdrop */}
+      {/* Filter Modal */}
       <Modal
         isVisible={isModalVisible}
         animationIn="slideInUp"
         animationOut="slideOutDown"
         style={styles.modal}
-        hasBackdrop={false} // Disable default backdrop - KEY CHANGE
+        hasBackdrop={false}
         coverScreen={true}
         deviceHeight={screenHeight}
         deviceWidth={screenWidth}
@@ -299,12 +296,10 @@ export default function OrdersScreen() {
         useNativeDriverForBackdrop={true}
         hideModalContentWhileAnimating={false}
       >
-        {/* Custom Backdrop that covers entire screen including status bar */}
         <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
           <View style={styles.customBackdrop} />
         </TouchableWithoutFeedback>
 
-        {/* Modal Content */}
         <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, 20) }]}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Filter Orders</Text>
@@ -317,7 +312,6 @@ export default function OrdersScreen() {
           </View>
           
           <ScrollView style={styles.modalBody}>
-            {/* Status Filter */}
             <View style={styles.filterSection}>
               <Text style={styles.filterSectionTitle}>Status</Text>
               <View style={styles.filterOptions}>
@@ -341,7 +335,6 @@ export default function OrdersScreen() {
               </View>
             </View>
 
-            {/* Date Filter */}
             <View style={styles.filterSection}>
               <Text style={styles.filterSectionTitle}>Date Range</Text>
               <View style={styles.filterOptions}>
@@ -364,10 +357,8 @@ export default function OrdersScreen() {
                 ))}
               </View>
             </View>
-
           </ScrollView>
 
-          {/* Action Buttons */}
           <View style={styles.filterActions}>
             <TouchableOpacity 
               style={styles.clearButton}
@@ -392,6 +383,7 @@ export default function OrdersScreen() {
   );
 }
 
+// Styles remain the same
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -575,16 +567,14 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
   },
-  // FIXED Modal Styles
   modal: {
     justifyContent: 'flex-end',
     margin: 0,
     padding: 0,
   },
-  // Custom backdrop that covers entire screen
   customBackdrop: {
     position: 'absolute',
-    top: StatusBar.currentHeight ? -StatusBar.currentHeight : 0, // Extend above status bar on Android
+    top: StatusBar.currentHeight ? -StatusBar.currentHeight : 0,
     left: 0,
     right: 0,
     bottom: 0,
@@ -597,7 +587,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     maxHeight: '80%',
     minHeight: '50%',
-    zIndex: 1, // Ensure content is above backdrop
+    zIndex: 1,
     position: 'relative',
   },
   modalHeader: {

@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Alert, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { addRetailer } from '../../utils/retailerStorage';
+import { api } from '../../utils/api';
 
 export default function NewRetailerScreen() {
   const router = useRouter();
@@ -59,7 +59,7 @@ export default function NewRetailerScreen() {
         bit: selectedBit,
       };
 
-      await addRetailer(newRetailer);
+      await api.retailers.create(newRetailer);
 
       Alert.alert(
         'Success!',

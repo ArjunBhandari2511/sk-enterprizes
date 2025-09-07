@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Alert, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { addBrand, addProduct, Brand, getBrands } from '../../utils/productStorage';
+import { api, Brand } from '../../utils/api';
 
 export default function NewItemScreen() {
   const router = useRouter();
@@ -19,10 +19,11 @@ export default function NewItemScreen() {
   React.useEffect(() => {
     const loadBrands = async () => {
       try {
-        const brandsData = await getBrands();
+        const brandsData = await api.brands.getAll();
         setBrands(brandsData);
       } catch (error) {
         console.error('Error loading brands:', error);
+        Alert.alert('Error', 'Failed to load brands. Please try again.');
       }
     };
     loadBrands();
@@ -58,9 +59,8 @@ export default function NewItemScreen() {
 
       if (newBrandName.trim()) {
         // Create new brand
-        const newBrand = await addBrand({
+        const newBrand = await api.brands.create({
           name: newBrandName.trim(),
-          productCount: 0,
           image: 'https://via.placeholder.com/100x100?text=' + encodeURIComponent(newBrandName.trim())
         });
         brandToUse = newBrand;
@@ -76,11 +76,11 @@ export default function NewItemScreen() {
 
       const newProduct = {
         name: productName.trim(),
-        brandId: brandToUse.id,
+        brandId: brandToUse._id,
         brandName: brandToUse.name,
       };
 
-      await addProduct(newProduct);
+      await api.products.create(newProduct);
 
       Alert.alert(
         'Success!',

@@ -5,7 +5,7 @@ import React, { useCallback, useState } from 'react';
 import { Alert, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { deleteRetailer, getRetailers, Retailer } from '../../utils/retailerStorage';
+import { api, Retailer } from '../../utils/api';
 
 export default function RetailersScreen() {
   const router = useRouter();
@@ -32,14 +32,18 @@ export default function RetailersScreen() {
   const loadRetailers = useCallback(async () => {
     try {
       setIsLoading(true);
-      const retailersData = await getRetailers();
+      const retailersData = await api.retailers.getAll(
+        value === 'all' ? undefined : value,
+        searchQuery || undefined
+      );
       setRetailers(retailersData);
     } catch (error) {
       console.error('Error loading retailers:', error);
+      Alert.alert('Error', 'Failed to load retailers. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [value, searchQuery]);
 
   // Load retailers on component mount and when screen comes into focus
   useFocusEffect(
@@ -63,7 +67,7 @@ export default function RetailersScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteRetailer(retailer.id);
+              await api.retailers.delete(retailer._id);
               // Reload retailers after deletion
               await loadRetailers();
               Alert.alert('Success', 'Retailer deleted successfully');
@@ -77,14 +81,8 @@ export default function RetailersScreen() {
     );
   };
 
-  // Filter retailers based on selected bit and search query
-  const filteredRetailers = retailers.filter(retailer => {
-    const matchesBit = value === 'all' || retailer.bit === value;
-    const matchesSearch = retailer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         retailer.phone.includes(searchQuery);
-    
-    return matchesBit && matchesSearch;
-  });
+  // Since we're now filtering on the server side, we can use retailers directly
+  const filteredRetailers = retailers;
 
   const BitsChooser = () => (
     <View style={styles.bitsChooserContainer}>
@@ -198,7 +196,7 @@ export default function RetailersScreen() {
             </View>
           ) : filteredRetailers.length > 0 ? (
             filteredRetailers.map((retailer) => (
-              <RetailerCard key={retailer.id} retailer={retailer} />
+              <RetailerCard key={retailer._id} retailer={retailer} />
             ))
           ) : (
             <View style={styles.emptyState}>

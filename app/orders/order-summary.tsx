@@ -3,10 +3,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { addOrder } from '../../utils/orderStorage';
+import { api } from '../../utils/api';
 
 interface SelectedItem {
-  productId: number;
+  productId: string;
   productName: string;
   brandName: string;
   unit: 'Pc' | 'Outer' | 'Case';
@@ -44,13 +44,13 @@ export default function OrderSummaryScreen() {
     setIsCreatingOrder(true);
     
     try {
-      const newOrder = await addOrder({
+      const newOrder = await api.orders.create({
         counterName: retailerName || 'Unknown Retailer',
         bit: retailerBit || 'Unknown Bit',
         totalItems: getTotalItems(),
         totalAmount: 0, // You can calculate this based on item prices if needed
-        status: 'Pending'
-      }, parsedOrderItems);
+        items: parsedOrderItems
+      });
 
       Alert.alert(
         'Order Confirmed!', 

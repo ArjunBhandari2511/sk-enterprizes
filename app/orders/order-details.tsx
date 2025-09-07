@@ -3,7 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Order, OrderItem } from '../../utils/orderStorage';
+import { Order, OrderItem } from '../../utils/api';
 
 export default function OrderDetailsScreen() {
   const router = useRouter();
